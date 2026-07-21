@@ -1006,6 +1006,82 @@
             }
         }
     </style>
+  :root {
+    --grass: #7CB342; --dirt: #8D6E63; --stone: #78909C;
+    --diamond: #00E5FF; --emerald: #00E676; --gold: #FFD600;
+    --redstone: #D32F2F; --lapis: #1976D2; --iron: #90A4AE; --coal: #212121;
+    --bg-dark: #1a1a2e; --bg-medium: #16213e;
+    --text-main: #ECEFF1;
+    --shadow-block: 4px 4px 0px rgba(0,0,0,0.5);
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg-dark); font-family:'VT323',monospace; color:var(--text-main); }
+ 
+  #npc-toggle {
+    position: fixed; bottom: 28px; right: 28px; width: 64px; height: 64px;
+    background: var(--bg-medium); border: 4px solid var(--emerald);
+    box-shadow: var(--shadow-block), 0 0 20px rgba(0,230,118,0.4);
+    font-size: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    z-index: 1000; transition: all 0.1s;
+  }
+  #npc-toggle:hover { transform: translate(2px,2px); box-shadow: 2px 2px 0px rgba(0,0,0,0.5); }
+ 
+  #npc-panel {
+    position: fixed; bottom: 104px; right: 28px; width: 360px; max-width: calc(100vw - 40px);
+    height: 500px; max-height: calc(100vh - 150px);
+    background: var(--bg-medium); border: 4px solid var(--stone); box-shadow: var(--shadow-block);
+    display: none; flex-direction: column; overflow: hidden; z-index: 1000;
+  }
+  #npc-panel.open { display: flex; }
+ 
+  #npc-header {
+    padding: 14px 16px; background: var(--bg-dark); border-bottom: 4px solid var(--emerald);
+    display: flex; align-items: center; gap: 10px;
+  }
+  #npc-header .icon { font-size: 24px; }
+  #npc-header .titles { flex: 1; }
+  #npc-header .name {
+    font-family: 'Press Start 2P', cursive; font-size: 9px; color: var(--emerald);
+    text-shadow: 2px 2px 0px rgba(0,0,0,0.5); letter-spacing: 0.5px;
+  }
+  #npc-header .sub { font-size: 13px; color: var(--iron); margin-top: 5px; }
+  #npc-close {
+    background: var(--redstone); border: 2px solid #8B0000; color: white;
+    font-family: 'Press Start 2P', cursive; font-size: 11px; width: 26px; height: 26px; cursor: pointer;
+  }
+  #npc-close:hover { background: #FF1744; }
+ 
+  #npc-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  #npc-body::-webkit-scrollbar { width: 6px; }
+  #npc-body::-webkit-scrollbar-thumb { background: var(--stone); }
+ 
+  .field-label {
+    font-family: 'Press Start 2P', cursive; font-size: 9px; color: var(--gold);
+    text-shadow: 1px 1px 0px rgba(0,0,0,0.5); margin-bottom: 8px;
+  }
+  select {
+    width: 100%; background: var(--bg-dark); border: 3px solid var(--stone); color: var(--text-main);
+    font-family: 'VT323', monospace; font-size: 16px; padding: 8px; box-shadow: inset 2px 2px 0px rgba(0,0,0,0.5);
+  }
+  select:focus { outline: none; border-color: var(--diamond); }
+ 
+  .hint-card {
+    background: var(--bg-dark); border: 2px solid var(--gold); padding: 12px; font-size: 15px; line-height: 1.4;
+  }
+  .hint-label {
+    font-family: 'Press Start 2P', cursive; font-size: 8px; color: var(--gold); margin-bottom: 6px; display:block;
+  }
+ 
+  #npc-more-btn {
+    background: var(--grass); border: 3px solid var(--emerald); color: white;
+    font-family: 'Press Start 2P', cursive; font-size: 10px; padding: 10px; cursor: pointer;
+    box-shadow: var(--shadow-block); width: 100%;
+  }
+  #npc-more-btn:hover:not(:disabled) { background: var(--emerald); }
+  #npc-more-btn:disabled { background: var(--stone); border-color: var(--iron); cursor: not-allowed; opacity: 0.6; }
+ 
+  .empty-msg { color: var(--iron); font-size: 14px; text-align: center; padding: 20px 0; }
+</style>
 </head>
 <body>
     <div class="world-background"></div>
@@ -2160,5 +2236,200 @@
             }
         });
     </script>
+<button id="npc-toggle" title="Hablar con el Aldeano Guía">🧑‍🌾</button>
+ 
+<div id="npc-panel">
+  <div id="npc-header">
+    <div class="icon">🧑‍🌾</div>
+    <div class="titles">
+      <div class="name">ALDEANO GUÍA</div>
+      <div class="sub">Elegí tu misión, pedí pistas</div>
+    </div>
+    <button id="npc-close">✕</button>
+  </div>
+  <div id="npc-body"></div>
+</div>
+ 
+<script>
+/* =========================================================
+   BANCO DE PISTAS
+   Mismos id que missionsData / questsData de index.html.
+   Si agregás una misión nueva ahí, agregá su entrada acá
+   con el mismo id y 2 o 3 pistas escalonadas.
+   ========================================================= */
+const HINTS = {
+  hardware1: [
+    "¿Sabés qué parte de la compu se usa para \"pensar\" y hacer todos los cálculos? Empezá buscando esa.",
+    "Pensá en una oficina: hay un jefe que decide (CPU), una mesa de trabajo temporal (RAM) y un archivo donde se guarda todo (disco duro). ¿Qué sería la placa madre en esa comparación?"
+  ],
+  software1: [
+    "Pensá: ¿qué programa hace que la compu funcione aunque vos no abras nada? Ese es un tipo. ¿Y los que abrís vos para algo puntual (escribir, jugar, navegar)? Ese es el otro.",
+    "El sistema operativo (Windows, Android...) es del primer grupo. Para el segundo, pensá en 3 apps que abrís seguido."
+  ],
+  binary1: [
+    "El binario solo usa 0 y 1. Cada posición vale el doble que la anterior: 1, 2, 4, 8, 16, 32... ¿Qué combinación de esos números suma 10?",
+    "10 = 8 + 2. Entonces en las posiciones de 8 y de 2 va un 1, en el resto un 0. Armá el número completo y repetí el truco para 25 y 50."
+  ],
+  algorithms1: [
+    "Un algoritmo es una secuencia de pasos ordenados. ¿Qué es lo PRIMERO que hacés antes de cebar un mate?",
+    "Ordená como una receta: buscar los elementos, calentar el agua, cebar, tomar. ¿Te falta algún paso intermedio en el medio?"
+  ],
+  internet1: [
+    "La dirección IP es como la dirección postal de tu compu en internet. ¿Para qué serviría tener una si nadie supiera adónde entregarte algo?",
+    "Un servidor guarda páginas web y las entrega cuando se las pedís. El DNS es como una agenda de contactos: traduce nombres fáciles (google.com) en la dirección real."
+  ],
+  digital1: [
+    "Pensá en todo lo que dejaste \"marcado\" en internet: fotos, comentarios, búsquedas. ¿Buscaste alguna vez tu propio nombre en Google?",
+    "Probá buscar tu usuario en distintas redes y anotá qué información pública encontrás sobre vos."
+  ],
+  digital2: [
+    "Una contraseña mala suele ser corta, obvia o algo que cualquiera adivinaría. ¿Qué la haría más difícil de descifrar?",
+    "Una segura mezcla mayúsculas, minúsculas, números y símbolos, y no tiene relación obvia con vos (ni tu cumple, ni tu nombre)."
+  ], digital3: [
+    "Entrá a la configuración de privacidad de una red que uses y fijate qué es visible para \"cualquiera\" vs \"solo amigos\".",
+    "Pensá: ¿qué datos tuyos no te gustaría que vea un desconocido? Esos probablemente conviene hacerlos privados."
+  ],
+  digital4: [
+    "El phishing es hacerse pasar por alguien confiable para robarte datos. ¿Recibiste alguna vez un mail sospechoso pidiendo tu contraseña?",
+    "Para el afiche pensá en las señales típicas: errores de escritura, links raros, urgencia falsa (\"¡tu cuenta se cierra en 1 hora!\")."
+  ],
+  digital5: [
+    "Pensá primero la definición: ¿en qué se parece y en qué se diferencia del bullying de siempre?",
+    "Para la segunda parte pensá en pasos concretos: guardar pruebas, contarle a un adulto de confianza, bloquear/reportar. No hay una sola respuesta correcta."
+  ],
+  digital6: [
+    "Pensá 3 preguntas para desconfiar de una noticia: ¿quién la publicó? ¿otras fuentes dicen lo mismo? ¿es reciente o vieja reciclada?",
+    "Para el caso real, elegí una noticia que se hizo viral y buscá si algún medio serio la desmintió o confirmó."
+  ],
+  programming1: [
+    "Pensá los pasos para dibujar un cuadrado a mano: avanzar, girar, avanzar, girar... ¿cuántas veces se repite ese patrón?",
+    "En Scratch buscá el bloque \"repetir\" y meté adentro solo dos bloques: mover y girar. ¿Cuántos grados hay que girar en cada esquina de un cuadrado?"
+  ],
+  quest1: [
+    "Pensá las piezas del juego: un personaje que se mueve, enemigos que caen, y una forma de detectar cuando se tocan.",
+    "Para el personaje usá teclas (izquierda/derecha). Para los enemigos, que aparezcan arriba y bajen dentro de un \"repetir por siempre\".",
+    "Usá el bloque \"si toca a...\" para detectar el choque y restar una vida o terminar el juego."
+  ],
+  quest2: [
+    "Investigá las 4 partes clave: unidad de control, unidad aritmético-lógica, memoria y entrada/salida. ¿Qué hace cada una?",
+    "Para la presentación pensá un diagrama simple con flechas mostrando cómo viaja la información entre esas partes."
+  ],
+  quest3: [
+    "Pensá un problema real que tengas con las redes que usás hoy. ¿Qué función inventarías para solucionarlo?",
+    "No hay una respuesta correcta: la idea es que justifiques por qué tu función mejora algo (privacidad, salud mental, creatividad, etc.)."
+  ]
+};
+ 
+// Mismos títulos que en missionsData / questsData (en español)
+const MISSION_TITLES = {
+  hardware1: "Explorando el Hardware",
+  software1: "Software y Aplicaciones",
+  binary1: "El Lenguaje Binario",
+  algorithms1: "Primeros Algoritmos",
+  internet1: "Cómo Funciona Internet",
+  digital1: "Huella Digital",
+  digital2: "Contraseñas Seguras",
+  digital3: "Privacidad en Redes",
+  digital4: "Phishing y Estafas",
+  digital5: "Ciberbullying",
+  digital6: "Fake News",
+  programming1: "Introducción a la Programación",
+  quest1: "⚔️ El Desafío del Creeper",
+  quest2: "⚔️ Arquitectura de la PC",
+  quest3: "⚔️ Red Social del Futuro"
+};
+ 
+const toggleBtn = document.getElementById('npc-toggle');
+const closeBtn = document.getElementById('npc-close');
+const panel = document.getElementById('npc-panel');
+const bodyEl = document.getElementById('npc-body');
+ 
+let currentMissionId = null;
+let hintsShown = 0;
+ 
+function renderPanel() {
+  bodyEl.innerHTML = '';
+ 
+  const label = document.createElement('div');
+  label.className = 'field-label';
+  label.textContent = '¿EN QUÉ MISIÓN ESTÁS?';
+  bodyEl.appendChild(label);
+ 
+  const select = document.createElement('select');
+  const placeholder = document.createElement('option');
+  placeholder.textContent = '-- Elegí una misión --';
+  placeholder.value = '';
+  select.appendChild(placeholder);
+ 
+  Object.keys(MISSION_TITLES).forEach(id => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = MISSION_TITLES[id];
+    if (id === currentMissionId) opt.selected = true;
+    select.appendChild(opt);
+  });
+ 
+  select.addEventListener('change', (e) => {
+    currentMissionId = e.target.value || null;
+    hintsShown = 0;
+    renderPanel();
+  });
+  bodyEl.appendChild(select);
+ 
+  if (!currentMissionId) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-msg';
+    empty.textContent = '🧑\u200d🌾 Elegí tu misión arriba y te doy la primera pista.';
+    bodyEl.appendChild(empty);
+    return;
+  }
+ 
+  const hints = HINTS[currentMissionId] || [];
+ 
+  for (let i = 0; i < hintsShown && i < hints.length; i++) {
+    const card = document.createElement('div');
+    card.className = 'hint-card';
+    const hl = document.createElement('span');
+    hl.className = 'hint-label';
+    hl.textContent = 'PISTA ' + (i + 1);
+    card.appendChild(hl);
+    card.appendChild(document.createTextNode(hints[i]));
+    bodyEl.appendChild(card);
+  }
+ 
+  const btn = document.createElement('button');
+  btn.id = 'npc-more-btn';
+  if (hintsShown === 0) {
+    btn.textContent = 'DAME LA PRIMERA PISTA';
+  } else if (hintsShown < hints.length) {
+    btn.textContent = 'DAME OTRA PISTA';
+  } else {
+    btn.textContent = 'NO HAY MÁS PISTAS';
+    btn.disabled = true;
+  }
+  btn.addEventListener('click', () => {
+    hintsShown++;
+    renderPanel();
+  });
+  bodyEl.appendChild(btn);
+ 
+  if (hintsShown >= hints.length && hints.length > 0) {
+    const final = document.createElement('div');
+    final.className = 'empty-msg';
+    final.textContent = '🧑\u200d🌾 Ya te di todas las pistas que tengo... ¡ahora es cosa tuya, aventurero!';
+    bodyEl.appendChild(final);
+  }
+}
+ 
+toggleBtn.addEventListener('click', () => {
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open') && bodyEl.children.length === 0) {
+    renderPanel();
+  }
+});
+closeBtn.addEventListener('click', () => panel.classList.remove('open'));
+ 
+renderPanel();
+</script>
 </body>
 </html>
